@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minecraft Mod & Texture Maker</title>
+    <!-- Three.js (for OBJ/MTL & GLTF loader) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/MTLLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <style>
+        :root {
+            --bg-main: #1e1e24;
+            --bg-side: #141418;
+            --bg-card: #2a2a32;
+            --accent: #4caf50;
+            --accent-hover: #45a049;
+            --text-color: #f5f5f5;
+            --text-muted: #aaaaaa;
+            --border-color: #3f3f4a;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        body, html {
+            width: 100%;
+            background-color: var(--bg-main);
+            color: var(--text-color);
+            overflow-x: hidden;
+            font-size: 14px; /* Компактный интерфейс */
+        }
+
+        /* Оверлей полноэкранного режима */
+        #fullscreen-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(10, 10, 12, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+
+        .fs-btn {
+            background-color: var(--accent);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.2s;
+        }
+
+        .fs-btn:hover {
+            background-color: var(--accent-hover);
+        }
+
+        .svg-icon {
+            width: 18px;
+            height: 18px;
+            fill: currentColor;
+        }
+
+        /* Основной каркас */
+        #app-container {
+            display: none;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        header {
+            background-color: var(--bg-side);
+            padding: 8px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .status-save {
+            font-size: 12px;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        /* Главное меню */
+        #main-menu {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 24px;
+            flex-wrap: wrap;
+            padding: 40px 20px;
+            min-height: calc(100vh - 50px);
+        }
+
+        .menu-card {
+            background-color: var(--bg-card);
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            width: 260px;
+            padding: 24px;
+            text-align: center;
+            cursor: pointer;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .menu-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--accent);
+        }
+
+        .menu-card .svg-icon {
+            width: 48px;
+            height: 48px;
+            margin-bottom: 16px;
+            color: var(--accent);
+        }
+
+        .menu-card h3 {
+            margin-bottom: 8px;
+            font-size: 18px;
+        }
+
+        .menu-card p {
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
+        /* Рабочие зоны */
+        .workspace {
+            display: none;
+            padding: 16px;
+            flex-direction: column;
+            gap: 16px;
+            max-width: 1400px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .back-btn {
+            background: none;
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            width: fit-content;
+        }
+
+        .back-btn:hover {
+            background-color: var(--bg-card);
+        }
+
+        /* Переключатели вкладок */
+        .tabs {
+            display: flex;
+            gap: 8px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
+        }
+
+        .tab-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            padding: 8px 16px;
+            cursor: pointer;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .tab-btn.active {
+            color: var(--accent);
+            border-bottom: 2px solid var(--accent);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Раздел МОДОВ: Скретч и Джава */
+        .mod-grid {
+            display: grid;
+            grid-template-columns: 240px 1fr;
+            gap: 16px;
+            align-items: start;
+        }
+
+        /* Палитра блоков */
+        .block-palette {
+            background-color: var(--bg-side);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 12px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .palette-title {
+            font-size: 12px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+
+        .scratch-block {
+            background-color: #335c87;
+            border-left: 5px solid #1d3b5c;
+            padding: 8px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            cursor: grab;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .scratch-block.event { background-color: #c8832a; border-left-color: #945d16; }
+        .scratch-block.action { background-color: #3b873e; border-left-color: #245726; }
+        .scratch-block.model-trigger { background-color: #7b1fa2; border-left-color: #4a148c; }
+
+        /* Дропзона */
+        .scratch-dropzone {
+            background-color: var(--bg-side);
+            border: 2px dashed var(--border-color);
+            border-radius: 6px;
+            min-height: 300px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .scratch-dropzone.dragover {
+            border-color: var(--accent);
+            background-color: rgba(76, 175, 80, 0.05);
+        }
+
+        /* Инструкция по коду */
+        .code-layout {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 16px;
+        }
+
+        textarea.code-editor {
+            width: 100%;
+            height: 400px;
+            background-color: #151515;
+            color: #7ec699;
+            font-family: 'Courier New', Courier, monospace;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            resize: vertical;
+            -webkit-user-select: text;
+            user-select: text;
+        }
+
+        .instruction-panel {
+            background-color: var(--bg-side);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .instruction-panel h4 {
+            margin-bottom: 8px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 4px;
+        }
+
+        .instruction-panel ul {
+            list-style: none;
+        }
+
+        .instruction-panel li {
+            margin-bottom: 10px;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        .instruction-panel code {
+            background-color: var(--bg-card);
+            padding: 2px 4px;
+            border-radius: 3px;
+            color: #ffb74d;
+        }
+
+        /* Раздел ТЕКСТУР и ПРЕДМЕТОВ */
+        .texture-layout {
+            display: grid;
+            grid-template-columns: 280px 1fr 320px;
+            gap: 16px;
+        }
+
+        .item-selector-panel, .model-panel {
+            background-color: var(--bg-side);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .search-box {
+            width: 100%;
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: white;
+            padding: 6px 10px;
+            border-radius: 4px;
+        }
+
+        .items-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+            gap: 6px;
+        }
+
+        .item-node {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 6px;
+            text-align: center;
+            cursor: pointer;
+            font-size: 10px;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            overflow: hidden;
+        }
+
+        .item-node:hover, .item-node.active {
+            border-color: var(--accent);
+            background-color: rgba(76, 175, 80, 0.1);
+        }
+
+        /* Пиксель-арт */
+        .canvas-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            background-color: var(--bg-side);
+            padding: 16px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+
+        #pixel-canvas {
+            background-color: #222;
+            border: 2px solid var(--border-color);
+            cursor: crosshair;
+            image-rendering: pixelated;
+        }
+
+        .palette-colors {
+            display: flex;
+            gap: 6px;
+        }
+
+        .color-swatch {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            border: 1px solid #fff;
+        }
+
+        /* Импорт 3D моделей */
+        .upload-zone {
+            border: 2px dashed var(--border-color);
+            padding: 16px;
+            text-align: center;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            background-color: var(--bg-card);
+        }
+
+        .upload-zone:hover {
+            border-color: var(--accent);
+        }
+
+        #canvas3d-container {
+            width: 100%;
+            height: 220px;
+            background-color: #000;
+            border-radius: 4px;
+            position: relative;
+        }
+
+        /* Скроллбары */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg-side);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Полноэкранный фиксатор -->
+    <div id="fullscreen-overlay">
+        <button class="fs-btn" onclick="activateFullscreen()">
+            <svg class="svg-icon" viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
+            Войти на весь экран (Горизонтально)
+        </button>
+    </div>
+
+    <!-- Основное приложение -->
+    <div id="app-container">
+        <header>
+            <div class="logo-area">
+                <svg class="svg-icon" viewBox="0 0 24 24" style="color:var(--accent);"><path d="M4 3h16c1.1 0 2 .9 2 2v14c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V5c0-1.1.9-2 2-2zm0 4v12h16V7H4zm2 2h3v2H6V9zm0 4h3v2H6v-2zm5-4h3v2h-3V9zm0 4h3v2h-3v-2zm5-4h3v2h-3V9zm0 4h3v2h-3v-2z"/></svg>
+                MC Mod Developer Studio
+            </div>
+            <div class="status-save" id="save-status">
+                <svg class="svg-icon" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                Сохранено в LocalStorage
+            </div>
+        </header>
+
+        <!-- Главное меню выбора -->
+        <div id="main-menu">
+            <div class="menu-card" onclick="openWorkspace('mod-workspace')">
+                <svg class="svg-icon" viewBox="0 0 24 24"><path d="M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L7.9 5 5 7.9 1.8 4.7C.6 7.1 1 10.1 3 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.4-.4.4-1.1 0-1.4z"/></svg>
+                <h3>Создать Мод</h3>
+                <p>Логика Scratch, Java кодинг и кастомные сущности типа Херобрина</p>
+            </div>
+            <div class="menu-card" onclick="openWorkspace('texture-workspace')">
+                <svg class="svg-icon" viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-2.98 0-5.4-2.42-5.4-5.4 0-1.81.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z"/></svg>
+                <h3>Создать Текстур Пак</h3>
+                <p>Выбор стандартных игровых предметов, пиксель-арт и замена 3D моделей</p>
+            </div>
+        </div>
+
+        <!-- Рабочее пространство: МОДЫ -->
+        <div id="mod-workspace" class="workspace">
+            <button class="back-btn" onclick="showMainMenu()">
+                <svg class="svg-icon" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg> Назад в меню
+            </button>
+            <div class="tabs">
+                <button class="tab-btn active" onclick="switchTab('mod-workspace', 'scratch-tab', this)">
+                    <svg class="svg-icon" viewBox="0 0 24 24"><path d="M12 2L2 22h20L12 2zm0 3.99L19.53 19H4.47L12 5.99z"/></svg> Логика Scratch
+                </button>
+                <button class="tab-btn" onclick="switchTab('mod-workspace', 'java-tab', this)">
+                    <svg class="svg-icon" viewBox="0 0 24 24"><path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/></svg> Исходный код Java
+                </button>
+            </div>
+
+            <!-- Вкладка Scratch -->
+            <div id="scratch-tab" class="tab-content active">
+                <div class="mod-grid">
+                    <div class="block-palette">
+                        <div class="palette-title">События</div>
+                        <div class="scratch-block event" draggable="true" data-type="event-start">При старте мира</div>
+                        <div class="scratch-block event" draggable="true" data-type="event-tick">Каждый такт (Tick)</div>
+                        <div class="scratch-block event" draggable="true" data-type="event-interact">Игрок бьет сущность</div>
+                        
+                        <div class="palette-title">Действия</div>
+                        <div class="scratch-block action" draggable="true" data-type="action-spawn">Призвать Херобрина</div>
+                        <div class="scratch-block action" draggable="true" data-type="action-lightning">Ударить молнией</div>
+                        <div class="scratch-block action" draggable="true" data-type="action-effect">Наложить эффект иссушения</div>
+
+                        <div class="palette-title">3D Сущности</div>
+                        <div class="scratch-block model-trigger" draggable="true" data-type="action-custom-model">Использовать импортированную модель</div>
+                    </div>
+                    <div class="scratch-dropzone" id="scratch-zone">
+                        <div style="color: var(--text-muted); font-size:12px; pointer-events: none;">Перетащите блоки событий и действий сюда для построения цепочки...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Вкладка Java -->
+            <div id="java-tab" class="tab-content">
+                <div class="code-layout">
+                    <div>
+                        <textarea class="code-editor" id="java-editor" oninput="saveData()"></textarea>
+                    </div>
+                    <div class="instruction-panel">
+                        <h4>Инструкция к коду</h4>
+                        <ul>
+                            <li><strong>Своя сущность / Херобрин:</strong> используйте класс <code>CustomEntity</code> расширяющий <code>MonsterEntity</code>.</li>
+                            <li><strong>Регистрация модели:</strong> метод <code>registerLayerDefinition()</code> связывает геометрию с рендером.</li>
+                            <li><strong>Призыв моба:</strong> функция <code>world.addFreshEntity(entity)</code> спавнит кастомный объект в координатах игрока.</li>
+                            <li><strong>События:</strong> аннотация <code>@SubscribeEvent</code> позволяет перехватывать любые действия игрока или мира.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Рабочее пространство: ТЕКСТУР ПАК -->
+        <div id="texture-workspace" class="workspace">
+            <button class="back-btn" onclick="showMainMenu()">
+                <svg class="svg-icon" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg> Назад в меню
+            </button>
+            
+            <div class="texture-layout">
+                <!-- Панель выбора любого предмета Майнкрафт -->
+                <div class="item-selector-panel">
+                    <h4>Выбор Предмета</h4>
+                    <input type="text" class="search-box" id="item-search" placeholder="Поиск предмета..." oninput="filterItems()">
+                    <div class="items-list" id="items-container">
+                        <!-- Динамически заполняется -->
+                    </div>
+                </div>
+
+                <!-- Редактор пикселей текстуры -->
+                <div class="canvas-container">
+                    <h4 id="current-item-title">Редактор: Алмазный меч</h4>
+                    <canvas id="pixel-canvas" width="256" height="256"></canvas>
+                    <div class="palette-colors">
+                        <div class="color-swatch" style="background-color: #ff0000;" onclick="setCurrentColor('#ff0000')"></div>
+                        <div class="color-swatch" style="background-color: #00ff00;" onclick="setCurrentColor('#00ff00')"></div>
+                        <div class="color-swatch" style="background-color: #0000ff;" onclick="setCurrentColor('#0000ff')"></div>
+                        <div class="color-swatch" style="background-color: #ffff00;" onclick="setCurrentColor('#ffff00')"></div>
+                        <div class="color-swatch" style="background-color: #ffffff;" onclick="setCurrentColor('#ffffff')"></div>
+                        <div class="color-swatch" style="background-color: #000000;" onclick="setCurrentColor('#000000')"></div>
+                    </div>
+                </div>
+
+                <!-- Панель Импорта 3D моделей (Блендер OBJ/GLTF) -->
+                <div class="model-panel">
+                    <h4>3D Модели Сущностей / Блоков</h4>
+                    <p style="font-size:11px; color:var(--text-muted);">Загрузите модель (из Blender), чтобы использовать кастомный вид для Херобрина или предметов.</p>
+                    <div class="upload-zone" onclick="document.getElementById('file-model').click()">
+                        <svg class="svg-icon" viewBox="0 0 24 24" style="width:32px; height:32px; margin-bottom:8px; color:var(--accent);"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
+                        <p>Нажмите для импорта .obj, .gltf или .glb</p>
+                        <input type="file" id="file-model" accept=".obj,.gltf,.glb" style="display:none;" onchange="handleModelUpload(event)">
+                    </div>
+                    <div id="canvas3d-container">
+                        <!-- Сюда встроится Three.js просмотрщик -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Список предметов Майнкрафт для выбора
+        const minecraftItems = [
+            "diamond_sword", "diamond_pickaxe", "diamond_axe", "apple", "golden_apple", 
+            "totem_of_undying", "elytra", "bow", "arrow", "tnt", "ender_pearl", "eye_of_ender",
+            "blaze_rod", "netherite_ingot", "netherite_chestplate", "zombie_spawn_egg", "creeper_head", "skeleton_skull"
+        ];
+
+        let activeItem = "diamond_sword";
+        let currentColor = "#ff0000";
+        let pixelSize = 16; // 16x16 сетка
+        let canvas, ctx;
+        let scene, camera, renderer, currentModelMesh;
+
+        // Полноэкранный режим
+        function activateFullscreen() {
+            const docEl = document.documentElement;
+            if (docEl.requestFullscreen) {
+                docEl.requestFullscreen();
+            }
+            if (screen.orientation && screen.orientation.lock) {
+                screen.orientation.lock('landscape').catch(() => {});
+            }
+            document.getElementById('fullscreen-overlay').style.display = 'none';
+            document.getElementById('app-container').style.display = 'flex';
+            initApp();
+        }
+
+        // Следим за выходом из полноэкранного режима
+        document.addEventListener('fullscreenchange', () => {
+            if (!document.fullscreenElement) {
+                document.getElementById('fullscreen-overlay').style.display = 'flex';
+                document.getElementById('app-container').style.display = 'none';
+            }
+        });
+
+        function initApp() {
+            initCanvas();
+            init3D();
+            renderItemsList();
+            loadData();
+        }
+
+        // Главное меню
+        function openWorkspace(id) {
+            document.getElementById('main-menu').style.display = 'none';
+            document.getElementById(id).style.display = 'flex';
+            if (id === 'texture-workspace') {
+                setTimeout(() => { 
+                    resizeCanvas(); 
+                    if(renderer) renderer.setSize(document.getElementById('canvas3d-container').clientWidth, 220);
+                }, 100);
+            }
+        }
+
+        function showMainMenu() {
+            document.querySelectorAll('.workspace').forEach(w => w.style.display = 'none');
+            document.getElementById('main-menu').style.display = 'flex';
+        }
+
+        function switchTab(workspaceId, tabId, btn) {
+            const workspace = document.getElementById(workspaceId);
+            workspace.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            workspace.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            btn.classList.add('active');
+            document.getElementById(tabId).classList.add('active');
+        }
+
+        // DRAG & DROP БЛОКОВ (Scratch)
+        const dropzone = document.getElementById('scratch-zone');
+        document.querySelectorAll('.scratch-block').forEach(block => {
+            block.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', e.target.innerText);
+                e.dataTransfer.setData('block-class', e.target.className);
+            });
+        });
+
+        dropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropzone.classList.add('dragover');
+        });
+
+        dropzone.addEventListener('dragleave', () => {
+            dropzone.classList.remove('dragover');
+        });
+
+        dropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropzone.classList.remove('dragover');
+            const text = e.dataTransfer.getData('text/plain');
+            const className = e.dataTransfer.getData('block-class');
+            
+            if(text) {
+                const newBlock = document.createElement('div');
+                newBlock.className = className;
+                newBlock.innerText = text;
+                newBlock.style.cursor = 'default';
+                
+                // Кнопка удаления элемента из цепи
+                const delBtn = document.createElement('span');
+                delBtn.innerHTML = ' &times;';
+                delBtn.style.color = '#ff8888';
+                delBtn.style.cursor = 'pointer';
+                delBtn.style.marginLeft = '10px';
+                delBtn.onclick = () => { newBlock.remove(); saveData(); };
+                
+                newBlock.appendChild(delBtn);
+                dropzone.appendChild(newBlock);
+                saveData();
+            }
+        });
+
+        // ПИКСЕЛЬ-АРТ РЕДАКТОР ТЕКСТУР
+        function initCanvas() {
+            canvas = document.getElementById('pixel-canvas');
+            ctx = canvas.getContext('2d');
+            
+            canvas.addEventListener('mousedown', drawPixel);
+            canvas.addEventListener('mousemove', (e) => {
+                if(e.buttons === 1) drawPixel(e);
+            });
+        }
+
+        function resizeCanvas() {
+            ctx.fillStyle = "#222222";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            // Отрисовка базовой сетки
+            ctx.strokeStyle = "#333333";
+            let step = canvas.width / pixelSize;
+            for(let i=0; i<=canvas.width; i+=step) {
+                ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); ctx.stroke();
+            }
+        }
+
+        function setCurrentColor(color) {
+            currentColor = color;
+        }
+
+        function drawPixel(e) {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            const step = canvas.width / pixelSize;
+            const pixelX = Math.floor(x / step) * step;
+            const pixelY = Math.floor(y / step) * step;
+            
+            ctx.fillStyle = currentColor;
+            ctx.fillRect(pixelX + 1, pixelY + 1, step - 2, step - 2);
+            saveData();
+        }
+
+        // Вывод предметов Майнкрафт
+        function renderItemsList() {
+            const container = document.getElementById('items-container');
+            container.innerHTML = '';
+            minecraftItems.forEach(item => {
+                const node = document.createElement('div');
+                node.className = `item-node ${item === activeItem ? 'active' : ''}`;
+                node.innerText = item.replace('_', ' ');
+                node.onclick = () => {
+                    document.querySelectorAll('.item-node').forEach(n => n.classList.remove('active'));
+                    node.classList.add('active');
+                    activeItem = item;
+                    document.getElementById('current-item-title').innerText = `Редактор: ${item.replace('_', ' ')}`;
+                    resizeCanvas();
+                };
+                container.appendChild(node);
+            });
+        }
+
+        function filterItems() {
+            const q = document.getElementById('item-search').value.toLowerCase();
+            document.querySelectorAll('.item-node').forEach(node => {
+                if(node.innerText.toLowerCase().includes(q)) {
+                    node.style.display = 'block';
+                } else {
+                    node.style.display = 'none';
+                }
+            });
+        }
+
+        // THREE.JS ПРОСМОТРЩИК СУЩНОСТЕЙ И 3D МОДЕЛЕЙ (Блендер)
+        function init3D() {
+            const container = document.getElementById('canvas3d-container');
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x141418);
+            
+            camera = new THREE.PerspectiveCamera(45, container.clientWidth / 220, 0.1, 100);
+            camera.position.set(0, 2, 5);
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(container.clientWidth, 220);
+            container.appendChild(renderer.domElement);
+            
+            const light = new THREE.AmbientLight(0xffffff, 0.8);
+            scene.add(light);
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
+            dirLight.position.set(5, 10, 7);
+            scene.add(dirLight);
+
+            // Создаем временный тестовый куб (заглушка кастомной сущности / Херобрина)
+            const geo = new THREE.BoxGeometry(1, 2, 1);
+            const mat = new THREE.MeshLambertMaterial({ color: 0x4caf50 });
+            currentModelMesh = new THREE.Mesh(geo, mat);
+            scene.add(currentModelMesh);
+
+            function animate() {
+                requestAnimationFrame(animate);
+                if(currentModelMesh) currentModelMesh.rotation.y += 0.01;
+                renderer.render(scene, camera);
+            }
+            animate();
+        }
+
+        function handleModelUpload(event) {
+            const file = event.target.files[0];
+            if(!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const contents = e.target.result;
+                
+                // Очищаем старую модель
+                if(currentModelMesh) scene.remove(currentModelMesh);
+
+                if (file.name.endsWith('.obj')) {
+                    const loader = new THREE.OBJLoader();
+                    const obj = loader.parse(contents);
+                    currentModelMesh = obj;
+                    scene.add(currentModelMesh);
+                } else if (file.name.endsWith('.gltf') || file.name.endsWith('.glb')) {
+                    const loader = new THREE.GLTFLoader();
+                    loader.parse(contents, '', function(gltf) {
+                        currentModelMesh = gltf.scene;
+                        scene.add(currentModelMesh);
+                    }, function(err){ console.error(err); });
+                }
+                saveData();
+            };
+            
+            if(file.name.endsWith('.obj')) {
+                reader.readAsText(file);
+            } else {
+                reader.readAsArrayBuffer(file);
+            }
+        }
+
+        // LOCAL STORAGE
+        function saveData() {
+            const data = {
+                javaCode: document.getElementById('java-editor').value,
+                scratchBlocks: document.getElementById('scratch-zone').innerHTML,
+                activeItem: activeItem
+            };
+            localStorage.setItem('mc_studio_save', JSON.stringify(data));
+            
+            const status = document.getElementById('save-status');
+            status.style.opacity = '1';
+            setTimeout(() => { status.style.opacity = '0.7'; }, 500);
+        }
+
+        function loadData() {
+            const saved = localStorage.getItem('mc_studio_save');
+            if(saved) {
+                const data = JSON.parse(saved);
+                if(data.javaCode) document.getElementById('java-editor').value = data.javaCode;
+                if(data.scratchBlocks) {
+                    document.getElementById('scratch-zone').innerHTML = data.scratchBlocks;
+                    // Перевешиваем удаление на загруженные элементы
+                    document.querySelectorAll('#scratch-zone span').forEach(span => {
+                        span.onclick = function() { this.parentElement.remove(); saveData(); };
+                    });
+                }
+            } else {
+                // Дефолтный шаблон мода на Java
+                document.getElementById('java-editor').value = `package com.mod.herobrine;
+
+import net.minecraft.entity.monster.MonsterEntity;
+import net.minecraftforge.fml.common.Mod;
+
+@Mod("herobrinemod")
+public class HerobrineMod {
+    // Ваш кастомный код сущности
+    public static class CustomEntity extends MonsterEntity {
+        // Логика кастомного мода и ИИ ИИ
+    }
+}`;
+            }
+        }
+    </script>
+</body>
+</html>
